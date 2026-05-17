@@ -1,0 +1,24 @@
+{
+  "themes": [
+    {
+      "name": "jollia",
+      "description": "Modern theme with centered search, second-row tabs, and green accent",
+      "tags": ["modern", "tabs", "green"]
+    },
+    {
+      "name": "ember",
+      "description": "Warm fixed sidebar with CSS Grid layout, no tabs",
+      "tags": ["warm", "simple", "sidebar"]
+    },
+    {
+      "name": "slate",
+      "description": "Collapsible sidebar with rich multi-column footer",
+      "tags": ["collapsible", "footer", "tabs"]
+    },
+    {
+      "name": "flux",
+      "description": "Production-grade Forge variant with extended CSS",
+      "tags": ["production", "sidebar", "advanced"]
+    }
+  ]
+}
