@@ -1,10 +1,11 @@
 /**
  * Slate theme manifest — collapsible sidebar + rich footer columns.
- * Inspired by Mintlify's Slate theme.
+  */
  */
 
 const manifest = {
 	name: "slate",
+	version: "1.0.0",
 	displayName: "Slate",
 	tagline: "Collapsible sidebar with rich footer columns",
 	defaults: {

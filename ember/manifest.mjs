@@ -1,10 +1,11 @@
 /**
  * Ember theme manifest — warm, simple left-right documentation layout.
- * Inspired by Mintlify's Maple theme. No tabs, just sidebar groups.
+  */
  */
 
 const manifest = {
 	name: "ember",
+	version: "1.0.0",
 	displayName: "Ember",
 	tagline: "Warm, simple documentation theme",
 	defaults: {

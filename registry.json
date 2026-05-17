@@ -1,22 +1,27 @@
 {
+  "url": "https://github.com/jolliai/themes",
   "themes": [
     {
       "name": "jollia",
+      "version": "1.0.0",
       "description": "Modern theme with centered search, second-row tabs, and green accent",
       "tags": ["modern", "tabs", "green"]
     },
     {
       "name": "ember",
+      "version": "1.0.0",
       "description": "Warm fixed sidebar with CSS Grid layout, no tabs",
       "tags": ["warm", "simple", "sidebar"]
     },
     {
       "name": "slate",
+      "version": "1.0.0",
       "description": "Collapsible sidebar with rich multi-column footer",
       "tags": ["collapsible", "footer", "tabs"]
     },
     {
       "name": "flux",
+      "version": "1.0.0",
       "description": "Production-grade Forge variant with extended CSS",
       "tags": ["production", "sidebar", "advanced"]
     }

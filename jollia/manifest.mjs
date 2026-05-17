@@ -4,6 +4,7 @@
 
 const manifest = {
 	name: "jollia",
+	version: "1.0.0",
 	displayName: "Jollia",
 	tagline: "The official Jolli documentation theme",
 	defaults: {
