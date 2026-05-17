@@ -1,0 +1,84 @@
+name: Validate themes
+on: [push, pull_request]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate manifests and registry
+        run: |
+          node --input-type=module -e "
+          import { readFileSync, existsSync } from 'fs';
+          import { pathToFileURL } from 'url';
+          import { resolve } from 'path';
+
+          const registry = JSON.parse(readFileSync('registry.json', 'utf-8'));
+          let failed = false;
+
+          for (const theme of registry.themes) {
+            const dir = theme.name;
+            const manifestPath = dir + '/manifest.mjs';
+
+            // 1. Theme folder exists
+            if (!existsSync(dir)) {
+              console.error('FAIL ' + theme.name + ': folder not found');
+              failed = true;
+              continue;
+            }
+
+            // 2. manifest.mjs exists
+            if (!existsSync(manifestPath)) {
+              console.error('FAIL ' + theme.name + ': manifest.mjs not found');
+              failed = true;
+              continue;
+            }
+
+            // 3. manifest.mjs parses without errors
+            let manifest;
+            try {
+              const mod = await import(pathToFileURL(resolve(manifestPath)).href);
+              manifest = mod.default ?? mod;
+            } catch (e) {
+              console.error('FAIL ' + theme.name + ': manifest parse error — ' + e.message);
+              failed = true;
+              continue;
+            }
+
+            // 4. manifest has version
+            if (!manifest.version) {
+              console.error('FAIL ' + theme.name + ': manifest missing version field');
+              failed = true;
+              continue;
+            }
+
+            // 5. manifest.version matches registry.version
+            if (manifest.version !== theme.version) {
+              console.error('FAIL ' + theme.name + ': version mismatch — manifest=' + manifest.version + ' registry=' + theme.version);
+              failed = true;
+              continue;
+            }
+
+            // 6. index.mjs exists and parses
+            const indexPath = dir + '/index.mjs';
+            if (!existsSync(indexPath)) {
+              console.error('FAIL ' + theme.name + ': index.mjs not found');
+              failed = true;
+              continue;
+            }
+            try {
+              await import(pathToFileURL(resolve(indexPath)).href);
+            } catch (e) {
+              console.error('FAIL ' + theme.name + ': index.mjs parse error — ' + e.message);
+              failed = true;
+              continue;
+            }
+
+            console.log('OK   ' + theme.name + ' v' + manifest.version);
+          }
+
+          if (failed) process.exit(1);
+          console.log('\nAll themes validated.');
+          "
