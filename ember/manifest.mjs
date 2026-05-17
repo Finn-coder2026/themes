@@ -1,6 +1,5 @@
 /**
  * Ember theme manifest — warm, simple left-right documentation layout.
-  */
  */
 
 const manifest = {

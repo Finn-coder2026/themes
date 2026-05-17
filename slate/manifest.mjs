@@ -1,6 +1,5 @@
 /**
  * Slate theme manifest — collapsible sidebar + rich footer columns.
-  */
  */
 
 const manifest = {
