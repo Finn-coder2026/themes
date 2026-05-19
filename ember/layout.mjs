@@ -25,7 +25,7 @@ import { getPageMap } from 'nextra/page-map'
 import 'nextra-theme-docs/style.css'
 import '../styles/api.css'
 import './themes/${manifest.name}.css'
-import { Layout } from 'nextra-theme-docs'
+import ScopedNextraLayout from '../components/ScopedNextraLayout'
 
 export const metadata = {
   title: ${title},
@@ -52,7 +52,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <Search placeholder="Search…" />
         </div>
 
-        <Layout
+        <ScopedNextraLayout
           navbar={navbar}
           pageMap={await getPageMap()}
           footer={footer}
@@ -62,7 +62,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           nextThemes={{ defaultTheme: ${defaultTheme} }}
         >
           {children}
-        </Layout>
+        </ScopedNextraLayout>
       </body>
     </html>
   )

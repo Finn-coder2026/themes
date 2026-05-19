@@ -12,6 +12,10 @@ const manifest = {
 		defaultTheme: "light",
 		fontFamily: "inter",
 	},
+	supports: {
+		pages: false,
+		menuPages: false,
+	},
 };
 
 export default manifest;

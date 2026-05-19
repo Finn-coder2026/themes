@@ -24,6 +24,18 @@
       "version": "1.0.0",
       "description": "Production-grade Forge variant with extended CSS",
       "tags": ["production", "sidebar", "advanced"]
+    },
+    {
+      "name": "forge",
+      "version": "1.0.0",
+      "description": "Developer-focused sidebar layout with accent-driven design tokens",
+      "tags": ["developer", "sidebar", "accent"]
+    },
+    {
+      "name": "atlas",
+      "version": "1.0.0",
+      "description": "Editorial handbook with serif headlines, dark default, and masthead footer",
+      "tags": ["editorial", "serif", "dark", "masthead"]
     }
   ]
 }
