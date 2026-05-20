@@ -16,17 +16,6 @@ export function generateLayout(config) {
 	const logoText = JSON.stringify(config.theme?.logoText || config.title || "Docs");
 	const logoDisplay = config.theme?.logoDisplay || (logoUrl ? "both" : "text");
 
-	// Header links
-	const headerLinks = (config.header?.items || [])
-		.map(item => {
-			const href = JSON.stringify(item.url);
-			const label = JSON.stringify(item.label);
-			const isExternal = item.url?.startsWith("http");
-			const target = isExternal ? ' target="_blank" rel="noreferrer"' : "";
-			return `<a key={${href}} className="flux-nav-link" href={${href}}${target}>{${label}}</a>`;
-		})
-		.join("\n    ");
-
 	// CTA button
 	let ctaButton = "";
 	if (config.header?.primary) {
@@ -58,11 +47,14 @@ export function generateLayout(config) {
 		footerJsx = `<Footer className="flux-footer"><div className="w-footer-bar"><span className="w-footer-copy">{${cp}}</span><div className="w-footer-bar-right"><a href="https://www.jolli.ai" target="_blank" rel="noopener noreferrer" className="w-footer-powered">Built with Jolli</a></div></div></Footer>`;
 	}
 
-	return `import { Footer, Layout, Navbar, ThemeSwitch } from 'nextra-theme-docs'
+	return `import { Footer, Navbar, ThemeSwitch } from 'nextra-theme-docs'
 import { Head, Search } from 'nextra/components'
 import { getPageMap } from 'nextra/page-map'
 import 'nextra-theme-docs/style.css'
+import '../styles/api.css'
 import './themes/${manifest.name}.css'
+import ScopedNextraLayout from '../components/ScopedNextraLayout'
+import SidebarTabs from '../components/SidebarTabs'
 
 export const metadata = {
   title: ${title},
@@ -78,7 +70,6 @@ const NavLogo = () => (
 
 const navbar = (
   <Navbar logo={<NavLogo />}>
-    ${headerLinks}
     ${ctaButton}
     <ThemeSwitch />
   </Navbar>
@@ -102,14 +93,18 @@ export default async function RootLayout({ children }) {
           <Search placeholder="Search…" />
         </div>
 
-        <Layout
+        <ScopedNextraLayout
           navbar={navbar}
-          search={false}
           pageMap={await getPageMap()}
           footer={footer}
+          editLink={null}
+          feedback={{ content: null }}
+          darkMode={true}
+          nextThemes={{ defaultTheme: ${defaultTheme} }}
         >
+          <SidebarTabs className="flux-sidebar-tabs" />
           {children}
-        </Layout>
+        </ScopedNextraLayout>
       </body>
     </html>
   )
