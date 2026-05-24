@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & Discussions
+    url: https://github.com/jolliai/themes/discussions
+    about: Ask questions or share ideas
+  - name: Security Vulnerabilities
+    url: https://github.com/jolliai/themes/security/advisories/new
+    about: Report security issues privately (do not file public issues)
+  - name: Jolli CLI Issues
+    url: https://github.com/jolliai/jolliai/issues/new/choose
+    about: Report bugs in the Jolli CLI itself (not theme-specific)
