@@ -1,0 +1,68 @@
+name: Bug Report
+description: Report a bug in a Jolli theme
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please provide the details below to help us reproduce and fix it.
+
+  - type: input
+    id: theme-name
+    attributes:
+      label: Theme
+      description: Which theme is affected?
+      placeholder: e.g. forge
+    validations:
+      required: true
+
+  - type: input
+    id: theme-version
+    attributes:
+      label: Theme Version
+      description: Check the theme's manifest.mjs or run `jolli theme list`
+      placeholder: e.g. 1.0.0
+    validations:
+      required: true
+
+  - type: input
+    id: cli-version
+    attributes:
+      label: Jolli CLI Version
+      description: Run `jolli --version`
+      placeholder: e.g. 0.99.2
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - macOS
+        - Linux
+        - Windows
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the bug and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run `jolli theme install ...`
+        2. Set theme in site.json
+        3. Run `jolli dev`
+        4. See error
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: If applicable, attach screenshots showing the issue.

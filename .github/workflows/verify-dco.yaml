@@ -1,0 +1,78 @@
+name: CI - Verify DCO
+
+on:
+    pull_request:
+        branches: [main]
+
+permissions:
+    contents: read
+
+jobs:
+    verify-dco:
+        runs-on: ubuntu-24.04
+        timeout-minutes: 5
+        steps:
+            -   uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+                with:
+                    fetch-depth: 0
+                    persist-credentials: false
+
+            -   name: Verify Signed-off-by trailer on every PR commit
+                env:
+                    BASE_SHA: ${{ github.event.pull_request.base.sha }}
+                    HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+                run: |
+                    set -euo pipefail
+
+                    mapfile -t commits < <(git rev-list "$BASE_SHA".."$HEAD_SHA")
+
+                    if [ "${#commits[@]}" -eq 0 ]; then
+                        echo "No commits to verify."
+                        exit 0
+                    fi
+
+                    failed=0
+                    for sha in "${commits[@]}"; do
+                        short=$(git log -1 --pretty='%h %s' "$sha")
+                        author_email=$(git show -s --format='%ae' "$sha" \
+                            | tr '[:upper:]' '[:lower:]')
+
+                        sob_emails=$(git show -s --format=%B "$sha" \
+                            | git interpret-trailers --parse \
+                            | grep -iE '^Signed-off-by:[[:space:]]+.+[[:space:]]+<.+@.+>[[:space:]]*$' \
+                            | sed -E 's/.*<([^>]+)>.*/\1/' \
+                            | tr '[:upper:]' '[:lower:]' \
+                            || true)
+
+                        if [ -z "$sob_emails" ]; then
+                            echo "::error::Missing or malformed Signed-off-by trailer on commit: $short"
+                            failed=$((failed + 1))
+                            continue
+                        fi
+
+                        if ! printf '%s\n' "$sob_emails" | grep -qxF "$author_email"; then
+                            found=$(printf '%s ' $sob_emails)
+                            echo "::error::Signed-off-by does not match author <$author_email> on commit: $short (found: ${found% })"
+                            failed=$((failed + 1))
+                        fi
+                    done
+
+                    if [ "$failed" -gt 0 ]; then
+                        {
+                            echo
+                            echo "DCO check failed for $failed commit(s)."
+                            echo
+                            echo "Every commit must end with a trailer of the form:"
+                            echo "    Signed-off-by: Your Name <your.email@example.com>"
+                            echo "and the email must match the commit author's email."
+                            echo
+                            echo "Amend the most recent commit:"
+                            echo "    git commit --amend -s --no-edit"
+                            echo "    git push --force-with-lease"
+                            echo
+                            echo "See CONTRIBUTING.md for the full policy."
+                        } >&2
+                        exit 1
+                    fi
+
+                    echo "All ${#commits[@]} commit(s) carry a matching Signed-off-by trailer."
