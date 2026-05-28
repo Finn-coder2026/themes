@@ -166,6 +166,38 @@ function buildHeaderItems(headerConfig) {
 		.join("");
 }
 
+/**
+ * Mobile disclosure widget for header.items[]. Lives outside the Navbar so
+ * it can be CSS-positioned over the mobile drawer (gated by the drawer's
+ * transform class — see css.mjs). Uses the CSS checkbox-hack so we stay
+ * CSS-only — no client state management — and avoid <details>'s habit of
+ * hiding its non-summary content via UA styles that fight transitions.
+ *
+ * Markup shape:
+ *   <div class="forge-mobile-nav">
+ *     <input type="checkbox" id="forge-mobile-nav-toggle" />  ← visually hidden
+ *     <label for="forge-mobile-nav-toggle" class="forge-mobile-nav-bump">
+ *       <svg class="forge-mobile-nav-chevron" />              ← rotates 180° when open
+ *     </label>
+ *     <ul>                                                   ← panel, slides down
+ *       <li><a class="forge-mobile-nav-link" /></li>
+ *     </ul>
+ *   </div>
+ */
+function buildMobileNavItems(headerConfig) {
+	const items = Array.isArray(headerConfig?.items) ? headerConfig.items : [];
+	if (items.length === 0) return "";
+	const links = items
+		.map((item) => {
+			const href = sanitizeUrl(item.url);
+			const isExternal = /^https?:/i.test(href);
+			const external = isExternal ? ' target="_blank" rel="noreferrer"' : "";
+			return `<li><a className="forge-mobile-nav-link" href={${JSON.stringify(href)}}${external}>{${JSON.stringify(item.label)}}</a></li>`;
+		})
+		.join("");
+	return `<div className="forge-mobile-nav"><input type="checkbox" id="forge-mobile-nav-toggle" className="forge-mobile-nav-toggle" aria-label="Toggle quick links" /><ul className="forge-mobile-nav-panel" aria-label="Quick links">${links}</ul><label htmlFor="forge-mobile-nav-toggle" className="forge-mobile-nav-bump"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="forge-mobile-nav-chevron" aria-hidden="true"><path d="M6 9l6 6 6-6" /></svg></label></div>`;
+}
+
 
 // ── Footer ──────────────────────────────────────────────────────────────────
 
@@ -274,6 +306,7 @@ export function generateLayout(config) {
 
 	const logoMarkup = buildLogoMarkup(title, logoUrl, logoUrlDark, logoText, useDefaults);
 	const headerItems = buildHeaderItems(config.header);
+	const mobileNavItems = buildMobileNavItems(config.header);
 	const footerJsx = buildFooterJsx(title, config.footer);
 
 	return `import { Footer, Navbar, ThemeSwitch } from 'nextra-theme-docs'
@@ -333,6 +366,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         >
           {children}
         </ScopedNextraLayout>
+        ${mobileNavItems}
       </body>
     </html>
   )

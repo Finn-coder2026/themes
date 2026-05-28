@@ -499,12 +499,6 @@ body { background-color: var(--w-bg); }
   }
 }
 
-/* Hide page-map duplicates from the navbar pages strip on desktop —
-   .forge-nav-link items render via Navbar JSX children instead. */
-.nextra-navbar nav > div > a[target="_blank"]:not(.forge-nav-link) {
-  display: none !important;
-}
-
 /* Layering during the BP1–BP2 transition where the sidebar coexists with
    the hamburger drawer. The drawer uses \`inset-0\` and paints its own
    background across the whole viewport (its inner content is just padded
@@ -554,6 +548,138 @@ aside.nextra-sidebar { z-index: 10 !important; }
   transition: color 0.12s;
 }
 .forge-nav-link[href^="http"]:hover::after { color: var(--w-text-strong); }
+
+/* Mobile disclosure for header.items[] — a small tab ("bump") hangs from the
+   navbar's bottom edge; tapping it slides a panel of quick links down over
+   the top of the hamburger drawer. Implemented as a CSS checkbox-hack so
+   open/close state lives entirely in CSS, no JS.
+
+   Structure: one container in flex-column with [panel, bump]. When closed,
+   the container is translated up by panel-height, leaving only the bump
+   visible just below the navbar. Tapping the bump (= label) toggles the
+   sibling checkbox, which flips the gating selector and slides the whole
+   thing back to translateY(0).
+
+   Layering:
+     container → z 70 (above .nextra-mobile-nav at z 60)
+
+   Brittle dependency: the visibility gate keys off the literal Tailwind
+   class Nextra emits on the open drawer ("translate3d(0,0,0)"). Nextra
+   is pinned, so version bumps give us a chance to re-verify. */
+.forge-mobile-nav { display: none; }
+
+@media (max-width: 767px) {
+  /* Show the whole disclosure only while the hamburger drawer is open. */
+  html:has(.nextra-mobile-nav[class*="translate3d(0,0,0)"]) .forge-mobile-nav {
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: var(--nextra-navbar-height);
+    left: 0;
+    right: 0;
+    z-index: 70;
+    pointer-events: none; /* children opt in */
+    /* Closed: shift the whole stack up by everything except the bump.
+       The offset must match the bump's height exactly — anything larger
+       leaves a strip of the panel peeking out below the navbar. */
+    transform: translateY(calc(-100% + 18px));
+    transition: transform 220ms var(--timing-swift, cubic-bezier(0.23, 0.88, 0.26, 0.92));
+  }
+  /* Open: bring the whole stack back into view. */
+  html:has(.forge-mobile-nav-toggle:checked) .forge-mobile-nav {
+    transform: translateY(0);
+  }
+
+  /* Push the drawer's auto-rendered items down so the bump isn't sitting
+     on top of "Get Started"/etc. when the disclosure is closed. Just enough
+     to clear the 18px bump plus the same ~4px gap Nextra uses between
+     adjacent items. (Nextra's inner <ul> already adds its own 16px padding,
+     so we only need 6px of extra push.) */
+  html:has(.nextra-mobile-nav[class*="translate3d(0,0,0)"]) .nextra-mobile-nav {
+    padding-top: calc(var(--nextra-navbar-height) + 6px) !important;
+  }
+
+  /* Visually hidden checkbox — keyboard reachable, label clicks toggle it. */
+  .forge-mobile-nav-toggle {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    border: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    pointer-events: none;
+  }
+
+  /* Panel: sits at the top of the container, flush against the navbar bottom. */
+  .forge-mobile-nav-panel {
+    pointer-events: auto;
+    list-style: none;
+    margin: 0;
+    padding: 0.625rem 1.5rem 0.875rem;
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--header-border);
+    box-shadow: 0 8px 16px -8px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Bump: small rounded tab centered horizontally at the bottom of the
+     container, hanging like a pull-handle. */
+  .forge-mobile-nav-bump {
+    pointer-events: auto;
+    align-self: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 18px;
+    background: var(--header-bg);
+    border: 1px solid var(--header-border);
+    border-top: none;
+    border-bottom-left-radius: 10px;
+    border-bottom-right-radius: 10px;
+    cursor: pointer;
+    transition: background 150ms ease;
+  }
+  .forge-mobile-nav-bump:hover {
+    background: var(--w-hover-bg);
+  }
+  .forge-mobile-nav-toggle:focus-visible ~ .forge-mobile-nav-bump {
+    outline: 2px solid var(--w-accent);
+    outline-offset: 2px;
+  }
+
+  .forge-mobile-nav-chevron {
+    width: 11px;
+    height: 11px;
+    color: var(--w-text-soft);
+    transition: transform 220ms var(--timing-swift, cubic-bezier(0.23, 0.88, 0.26, 0.92));
+  }
+  .forge-mobile-nav-toggle:checked ~ .forge-mobile-nav-bump .forge-mobile-nav-chevron {
+    transform: rotate(180deg);
+  }
+
+  .forge-mobile-nav-link {
+    display: block;
+    padding: 0.5rem 0;
+    font-size: 0.9375rem;
+    font-weight: 500;
+    font-family: inherit;
+    color: var(--w-text-strong);
+    text-decoration: none;
+    transition: color 0.12s;
+  }
+  .forge-mobile-nav-link:hover { color: var(--w-accent); }
+  .forge-mobile-nav-link[href^="http"]::after {
+    content: '↗';
+    display: inline-block;
+    margin-left: 0.3em;
+    font-size: 0.85em;
+    color: var(--w-text-faint);
+  }
+}
 
 .forge-navbar-logo {
   display: flex;
