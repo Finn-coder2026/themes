@@ -101,15 +101,22 @@ article strong { color: var(--w-text-strong) !important; font-weight: 600 !impor
    TABLES
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* \`display: block\` (rather than \`table\`) lets the table cap at the content
+   column width and scroll horizontally when its columns are wider, instead of
+   pushing past the column. \`width: 100%\` keeps narrow tables filling the
+   column; \`max-width: 100%\` enforces the cap so wide tables overflow into the
+   scroll area rather than the page. */
 article table {
   width: 100% !important;
+  max-width: 100% !important;
   font-size: 0.875rem !important;
   border-collapse: collapse !important;
   border-spacing: 0 !important;
   border: none !important;
   border-radius: 0 !important;
-  overflow: visible !important;
-  display: table !important;
+  display: block !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
   margin: 1.5rem 0 !important;
 }
 
@@ -200,6 +207,17 @@ article code:not(pre code) {
   border-radius: 0 0 0.625rem 0.625rem !important;
   border-top: none !important;
   box-shadow: none !important;
+}
+
+/* Word-wrap toggle. The toggle button flips \`data-nextra-word-wrap\` on <html>,
+   but Nextra only applies wrapping under the md breakpoint (max-md) and hides
+   the button on desktop. Forge keeps the button visible at all widths (the
+   button rules below set display:flex, overriding Nextra's md:hidden), so the
+   wrap must take effect on desktop too — otherwise the button toggles nothing
+   visible. Mirror Nextra's mobile behaviour (whitespace: pre-wrap) at all
+   widths when the attribute is set. */
+html[data-nextra-word-wrap] .nextra-code pre code {
+  white-space: pre-wrap !important;
 }
 
 /* Copy + word-wrap buttons — consistent size wherever they appear */
@@ -520,10 +538,21 @@ details summary > svg { color: var(--w-text-soft) !important; flex-shrink: 0 !im
 details summary a { color: var(--w-text-faint) !important; }
 details summary a:hover { background: var(--w-hover-bg) !important; color: var(--w-text-soft) !important; }
 
+/* The Collapse grid wrapper's implicit column is \`auto\`-sized, so it grows to
+   the max-content width of its children — a wide code block would stretch the
+   whole accordion instead of scrolling. Pin the column to \`minmax(0, 1fr)\` (0
+   minimum) so it can't exceed the accordion width. */
+details > div {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
 /* Content area — padding lives on the inner div inside the Collapse grid wrapper.
    Cannot pad the grid wrapper itself: it animates to height 0 when closed, but
-   padding on the grid container would still render and peek through. */
+   padding on the grid container would still render and peek through.
+   \`min-width: 0\` lets it shrink below its content's intrinsic width so an inner
+   code block's \`overflow-x: auto\` produces a scrollbar rather than expansion. */
 details > div > div {
+  min-width: 0 !important;
   padding: 0.875rem 1rem !important;
 }
 
@@ -2181,16 +2210,6 @@ select.api-tryit-input:not([multiple]) {
   article h1 + p           { font-size: 0.9375rem !important; margin-bottom: 1.25rem !important; }
   article h2               { font-size: 1.0625rem !important; margin-top: 1.875rem !important; }
   article h3               { font-size: 0.9375rem !important; margin-top: 1.5rem !important; }
-
-  /* Tables overflow horizontally within the article column instead of forcing
-     the whole page to scroll. \`display: block\` is needed because table layout
-     ignores overflow on the table element itself. */
-  article table {
-    display: block !important;
-    width: 100% !important;
-    overflow-x: auto !important;
-    -webkit-overflow-scrolling: touch;
-  }
 
   /* Code blocks: trim the inset so long lines don't get clipped too aggressively. */
   .nextra-code pre, article pre { padding: 0 0.75rem !important; }
