@@ -3,37 +3,37 @@
   "themes": [
     {
       "name": "jollia",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "description": "Modern theme with centered search, second-row tabs, and green accent",
       "tags": ["modern", "tabs", "green"]
     },
     {
       "name": "ember",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "description": "Warm fixed sidebar with CSS Grid layout, no tabs",
       "tags": ["warm", "simple", "sidebar"]
     },
     {
       "name": "slate",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "description": "Collapsible sidebar with rich multi-column footer",
       "tags": ["collapsible", "footer", "tabs"]
     },
     {
       "name": "flux",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "description": "Production-grade Forge variant with extended CSS",
       "tags": ["production", "sidebar", "advanced"]
     },
     {
       "name": "forge",
-      "version": "2.1.1",
+      "version": "2.1.2",
       "description": "Developer-focused sidebar layout with accent-driven design tokens",
       "tags": ["developer", "sidebar", "accent"]
     },
     {
       "name": "atlas",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "description": "Editorial handbook with serif headlines, dark default, and masthead footer",
       "tags": ["editorial", "serif", "dark", "masthead"]
     }

@@ -4,7 +4,7 @@
 
 const manifest = {
 	name: "ember",
-	version: "2.0.0",
+	version: "2.0.1",
 	displayName: "Ember",
 	tagline: "Warm, simple documentation theme",
 	defaults: {
