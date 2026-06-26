@@ -4,6 +4,8 @@ Community themes for [Jolli](https://jolli.ai) documentation sites.
 
 Each theme is a self-contained directory with layout, CSS, and a manifest that the Jolli CLI (`jolli dev`, `jolli build`) picks up automatically.
 
+this is the new line
+
 ## Available Themes
 
 | Theme | Description |
