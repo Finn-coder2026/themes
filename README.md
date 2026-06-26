@@ -1,4 +1,7 @@
 # Jolli Themes
+春眠不觉晓
+
+处处闻啼鸟
 
 Community themes for [Jolli](https://jolli.ai) documentation sites.
 
