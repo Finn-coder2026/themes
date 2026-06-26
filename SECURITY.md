@@ -13,6 +13,8 @@ If you cannot use GitHub Security Advisories, email `security@jolli.ai` instead.
 Please include:
 
 - A description of the issue and its impact.
+
+this is the new line
 - Steps to reproduce, or a proof-of-concept where possible.
 - The affected theme name and version.
 
