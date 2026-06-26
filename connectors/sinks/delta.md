@@ -1,0 +1,190 @@
+# Delta Lake output connector
+忽如一夜春风来
+[Delta Lake](https://delta.io/) is a popular open table format based on Parquet files.
+It is typically used with the [Apache Spark](https://spark.apache.org/) runtime.
+Data in a Delta Lake is organized in tables, stored in
+a file system or an object stores like [AWS S3](https://aws.amazon.com/s3/),
+[Google GCS](https://cloud.google.com/storage), or
+[Azure Blob Storage](https://azure.microsoft.com/en-us/products/storage/blobs).
+
+The Delta Lake output connector does not yet support [fault
+tolerance](/pipelines/fault-tolerance).
+
+## Support for delete operations
+
+The Delta Lake format does not support efficient real-time deletes and updates.
+To delete a record from a Delta table, one must first locate the record, which
+often requires an expensive table scan. This limitation makes it inefficient to
+directly write the output of a Feldera pipeline, which consists of both inserts
+and deletes, to a Delta table.
+
+To address this issue, the Delta Lake connector transforms both inserts and deletes
+into table records with additional metadata columns that describe the type and order
+of operations. Specifically, the connector adds the following columns to the output
+Delta table:
+
+| Column         | Type      | Description                                                                   |
+|----------------|-----------|-------------------------------------------------------------------------------|
+| `__feldera_op` | `VARCHAR` | Operation that this record represents: `i` for "insert", `d` for "delete", or `u` for "update".  |
+| `__feldera_ts` | `BIGINT`  | Timestamp of the update, used to establish the order of updates. Updates with smaller timestamps are applied before those with larger timestamps. |
+
+Effectively, we treat the table as a change log, where every record corresponds to
+either an insert or delete operation. The user can run a periodic Spark job to
+incorporate this change log into another Delta table, using the SQL `MERGE INTO` operation. An example of the code is below:
+
+```sql
+MERGE INTO {target_table} AS target
+        USING (
+          SELECT *
+          FROM (
+            SELECT *,
+                   ROW_NUMBER() OVER (
+                     PARTITION BY {merge_key}
+                     ORDER BY __feldera_ts DESC
+                   ) as rn
+            FROM {source_table}
+            -- Only consider new updates since the last merge.
+            WHERE __feldera_ts >= (
+              SELECT COALESCE(MAX(__feldera_ts), 0)
+              FROM {target_table}
+            )
+          )
+          -- Only apply the last update for each key.
+          WHERE rn = 1
+        ) AS source
+        ON target.{merge_key} = source.{merge_key}
+
+        WHEN MATCHED AND source.__feldera_op = 'd' THEN
+          DELETE
+
+        WHEN MATCHED AND source.__feldera_op = 'u' THEN
+          UPDATE SET *
+
+        WHEN NOT MATCHED AND source.__feldera_op = 'i' THEN
+          INSERT *
+
+        WHEN NOT MATCHED AND source.__feldera_op = 'u' THEN
+          INSERT *
+```
+
+## Delta Lake output connector configuration
+
+| Parameter  | Description |
+|------------|------------|
+| `uri`*     | Table URI, e.g., `"s3://feldera-fraud-detection-data/feature_train"`. |
+| `mode`*    | Determines how the Delta table connector handles an existing table at the target location. Options: |
+|            | - `append`: New updates will be appended to the existing table at the target location. If the table doesn't exist, it will be created. |
+|            | - `truncate`: Existing table at the specified location will be truncated on the first pipeline start. When the pipeline resumes from a checkpoint the table is kept as-is so that data written before the restart is preserved. |
+|            | - `error_if_exists`: If a table exists at the specified location, the operation will fail. When the pipeline resumes from a checkpoint the existing table is opened without error. |
+| `checkpoint_interval` | <p>Checkpoint interval (i.e., the number of commits after which a new checkpoint should be created) for newly created Delta tables.</p><p>The option is only available when creating the Delta table (`mode = append` and there is no existing table at the target location or `mode = truncate`). It configures the `checkpointInterval` table property, which determines the number of commits after which a new checkpoint should be created.</p><p>0 means no checkpoints are created.</p><p>Default: 10.</p>|
+| `log_retention_duration` | <p>Log retention duration for newly created Delta tables.</p><p>Configures the `delta.logRetentionDuration` table property, which controls how long the table's transaction-log history is kept.  Each time a checkpoint is written, Delta Lake automatically cleans up log entries older than this interval (subject to `enable_expired_log_cleanup`).</p><p>The option is only available when creating the Delta table (`mode = append` and there is no existing table at the target location, or `mode = truncate`).</p><p>The value follows the Delta Lake interval syntax `"interval <N> <unit>"`, where `<unit>` is one of `nanosecond[s]`, `microsecond[s]`, `millisecond[s]`, `second[s]`, `minute[s]`, `hour[s]`, `day[s]`, or `week[s]`.  Examples: `"interval 30 days"`, `"interval 6 hours"`.</p><p>Default: `"interval 30 days"` (Delta Lake default).</p>|
+| `enable_expired_log_cleanup` | <p>Whether to clean up expired log entries when a checkpoint is written.</p><p>Configures the `delta.enableExpiredLogCleanup` table property.  When set to `false`, transaction-log entries are retained indefinitely regardless of `log_retention_duration`.</p><p>The option is only available when creating the Delta table (`mode = append` and there is no existing table at the target location, or `mode = truncate`).</p><p>Default: `true` (Delta Lake default).</p>|
+| `max_retries`|<p>Maximum number of retries for failed Delta Lake operations like writing Parquet files and committing transactions.</p><p>The connector performs retries on several levels: individual S3 operations, Delta Lake transaction commits, and overall operation retries. This setting controls the overall operation retries. When a write to the table fails, because of an S3 timeout or any other reason that was not resolved by lower-level retries, the connector will retry the entire operation.</p><p>When not specified, the connector performs infinite retries. When set to 0, the connector doesn't retry failed operations.</p>|
+| `threads` | Number of parallel threads used by the connector. Increasing this value can improve Delta Lake write throughput by enabling concurrent writes. Default: `1`. |
+
+[*]: Required fields
+
+### Storage parameters
+
+Additional configuration options are defined for specific storage backends.  Refer to
+backend-specific documentation for details:
+
+* [Amazon S3 options](https://docs.rs/object_store/latest/object_store/aws/enum.AmazonS3ConfigKey.html)
+* [Azure Blob Storage options](https://docs.rs/object_store/latest/object_store/azure/enum.AzureConfigKey.html)
+* [Google Cloud Storage options](https://docs.rs/object_store/latest/object_store/gcp/enum.GoogleConfigKey.html)
+
+### Views with unique keys
+
+If the SQL view contains a **unique key**—a set of columns that uniquely identify each record—the Delta Lake connector can optimize updates by combining a delete and insert with the same key into a single **atomic update**. In such cases, the connector emits a record with the `__feldera_op` field set to `'u'` (for **update**).
+
+To enable this optimization:
+
+* Use the `CREATE INDEX` statement to define the unique key on the view.
+* Set the connector's `index` property to reference this index.
+
+For more information, see the [documentation on views with unique keys](/connectors/unique_keys#views-with-unique-keys).
+
+## Data type mapping
+
+See [source connector documentation](/connectors/sources/delta/#data-type-mapping) for DeltaLake to Feldera SQL
+type mapping.
+
+## The small file problem and output buffer configuration
+
+By default a Feldera pipeline sends a batch of changes to the output transport
+for each batch of input updates it processes.  This can result in a stream of
+small updates, which is normal and even preferable for output transports like
+Kafka; however it can cause problems for the Delta Lake format by creating a large
+number of small files.
+
+The output buffer mechanism is designed to solve this problem by decoupling the
+rate at which the pipeline pushes changes to the output transport from the rate
+of input changes.  It works by accumulating updates inside the pipeline
+for up to a user-defined period of time or until accumulating a user-defined number
+of updates and writing them to the Delta Table as a small number of large files.
+
+See [output buffer](/connectors#configuring-the-output-buffer) for details on configuring the output buffer mechanism.
+
+## Example usage
+
+### Streaming incremental updates
+
+Create a Delta Lake output connector that writes a stream of updates to a table
+stored in an S3 bucket, truncating any existing contents of the table.
+
+```sql
+CREATE VIEW V
+WITH (
+ 'connectors' = '[{
+    "transport": {
+      "name": "delta_table_output",
+      "config": {
+        "uri": "s3://feldera-fraud-detection-demo/feature_train",
+        "mode": "truncate",
+        "aws_access_key_id": <AWS_ACCESS_KEY_ID>,
+        "aws_secret_access_key": <AWS_SECRET_ACCESS_KEY>,
+        "aws_region": "us-east-1"
+      }
+    },
+    "enable_output_buffer": true,
+    "max_output_buffer_time_millis": 10000
+ }]'
+)
+AS SELECT * FROM my_table;
+```
+
+### Sending a snapshot at startup
+
+Set `send_snapshot: true` to have the connector emit a full snapshot of a
+materialized view to the Delta table before streaming incremental updates. This
+is useful when downstream consumers need the complete current state of the
+view, not just changes since the connector was created.
+
+The snapshot is sent exactly once per connector lifetime. Resuming the
+pipeline from a checkpoint does not re-send it. Modifying the connector
+triggers a fresh snapshot on the next start, and is delivered even if the
+pipeline is started or resumed in `Paused` state.
+
+```sql
+CREATE MATERIALIZED VIEW V
+WITH (
+ 'connectors' = '[{
+    "name": "delta_sink",
+    "send_snapshot": true,
+    "transport": {
+      "name": "delta_table_output",
+      "config": {
+        "uri": "s3://my-bucket/my-table",
+        "mode": "truncate",
+        "aws_access_key_id": <AWS_ACCESS_KEY_ID>,
+        "aws_secret_access_key": <AWS_SECRET_ACCESS_KEY>,
+        "aws_region": "us-east-1"
+      }
+    },
+    "enable_output_buffer": true,
+    "max_output_buffer_time_millis": 10000
+ }]'
+)
+AS SELECT * FROM my_table;
+```
+

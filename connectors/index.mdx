@@ -1,0 +1,229 @@
+# Connectors: connect to data sources and sinks
+
+A Feldera pipeline can process data from multiple heterogeneous sources and
+produce outputs to multiple heterogeneous destinations. To this end it relies
+on a growing library of **[input](sources)** and **[output](sinks)** connectors.
+
+## Basics
+
+Users configure connectors using a JSON object, that describes an external source or sink such as a database
+table or a Kafka topic. A SQL table can have multiple source connectors attached to it, specified as a
+list of JSON connector objects under the `'connectors'` attribute in the `WITH` clause of the table.
+Similarly, a views can have multiple sink connectors attached to it.
+
+Here is an example, where the `VENDOR` table has one connector, configured to fetch and insert JSON data
+from an HTTP URL, and a `VENDOR_VIEW` which sends the changes of the view
+to a Kafka topic in a format that can be consumed by Debezium:
+
+```sql
+create table VENDOR (
+    id bigint not null primary key,
+    name varchar,
+    address varchar
+) WITH ('connectors' = '[{
+    "transport": {
+        "name": "url_input", "config": {"path": "https://feldera-basics-tutorial.s3.amazonaws.com/vendor.json"}
+    },
+    "format": { "name": "json" }
+}]');
+
+create view VENDOR_VIEW
+WITH (
+    'connectors' = '[{
+        "max_queued_records": 1000,
+        "format": {
+            "name": "json",
+            "config": {
+                "update_format": "debezium"
+            }
+        },
+        "transport": {
+            "name": "kafka_output",
+            "config": {
+                "bootstrap.servers": "redpanda:9092",
+                "topic": "test_view"
+            }
+        }
+    }]'
+)
+as select * from VENDOR;
+```
+
+:::info
+
+The `WITH` clause for tables needs to be put at the end, after the column definitions, whereas for views it has to
+appear before the `AS` clause to resolve any parsing ambiguities.
+
+:::
+
+A connector specification consists of three parts:
+
+* [Generic attributes](#generic-attributes) common to all connectors, such as backpressure thresholds.
+* Transport specification (`transport`) for either [input](/connectors/sources/) or [output](/connectors/sinks/)
+  defines the data transport to be used by the connector.
+  Example transports include [Kafka](/connectors/sources/kafka),
+  [URL](/connectors/sources/http-get), [Delta Lake](/connectors/sources/delta), etc.
+* [Data format specification](/formats) (`format`), which defines the data format for the connector.
+  Example data formats include [CSV](/formats/csv), [JSON](/formats/json), [Parquet](/formats/parquet), or
+  Avro.
+
+:::note
+
+Some transports, e.g., [Delta Lake](/connectors/sinks/delta) and
+[datagen](/connectors/sources/datagen), use fixed predefined data formats and do not require the
+format section in the connector specification.
+
+:::
+
+This architecture allows the user to combine different transports and data formats.
+
+These basics apply to all connectors **except** the HTTP [input](/connectors/sources/http) and
+[output](/connectors/sinks/http) connectors which are not managed by the user, as they directly feed/fetch data
+into/from a pipeline via dedicated pipeline endpoints and therefore do not need to be configured in the `WITH` clauses
+of tables and views.
+
+## Generic attributes
+
+The following attributes are common to all connectors:
+
+* `name` - The name that is given to the connector, which must be
+  unique among the connectors of the table or view. This is particularly
+  useful to define when wanting to refer to it, for example to
+  [start or pause it at runtime](/connectors/orchestration).
+  By default, it will be named `unnamed-{index}`, with the zero-based index
+  within the list of connectors of its table/view.
+
+* `paused` - If set to to true the connector will not fetch or push data to the pipeline when started
+   unless [explicitly enabled through the API](/api/control-input-connector).
+   By default this is set to false.
+
+* `labels` - An optional list of text labels associated with the connector.
+  This property is used in conjunction with the `start_after` property
+  to implement [automatic connector orchestration](/connectors/orchestration#automatic-connector-orchestration).
+
+* `start_after` - Specifies one or more labels. When this property is set, the connector is created
+  in the Paused state and is automatically activated once all connectors tagged with at least one
+  of the specified labels have finished ingesting data.  This property is used in conjunction with the `labels` property
+  to implement [automatic connector orchestration](/connectors/orchestration#automatic-connector-orchestration).
+
+* <a name="max_queued_records">`max_queued_records`</a> - The
+  approximate maximum number of records to keep in memory.  For an
+  input connector, this is the maximum number that the endpoint will
+  read into memory, before the endpoint pauses further reading until
+  the pipeline has consumed some of the backlog.  For an output
+  connector, this is the maximum number that the endpoint will hold in
+  memory waiting for the output endpoint to send them, before the
+  circuit pauses execution until the backlog subsides.  By default,
+  this is 1,000,000.
+
+* <a name="max_batch_size">`max_batch_size`</a> - Maximum number of records from this connector to process in a single batch.
+
+  When set, this caps how many records are taken from the connector’s input
+  buffer and pushed through the circuit at once.
+
+  This is typically configured lower than `max_queued_records` to allow the
+  connector time to restart and refill its buffer while a batch is being
+  processed.
+
+  Not all input adapters honor this limit.
+
+  If this is not set, the batch size is derived from `max_worker_batch_size`.
+
+* <a name="max_worker_batch_size">`max_worker_batch_size`</a> - Maximum number of records processed per batch, per worker thread.
+
+  When `max_batch_size` is not set, this setting is used to cap
+  the number of records that can be taken from the connector’s input
+  buffer and pushed through the circuit at once.  The effective batch size is computed as:
+  `max_worker_batch_size × workers`.
+
+  This provides an alternative to `max_batch_size` that automatically adjusts batch
+  size as the number of worker threads changes to maintain constant amount of
+  work per worker per batch.
+
+  Defaults to 10,000 records per worker.
+
+* `index` – *(Output connectors only)* The name of an index created by a SQL
+  CREATE INDEX statement that defines
+  the unique key for the view. This allows the connector to combine related
+  insert and delete events into a single atomic update.
+  See [Uniqueness Constraints](/connectors/unique_keys).
+
+* `send_snapshot` – *(Output connectors only)* When `true`, the connector
+  emits a full snapshot of the materialized view the first time it runs,
+  before streaming incremental updates. The view must be materialized
+  (declared with `CREATE MATERIALIZED VIEW`). The default is `false`.
+
+  The snapshot is sent exactly once: resuming from a checkpoint does not
+  re-send it. Modifying the connector configuration causes a fresh
+  snapshot to be replayed on the next start.
+
+### Configuring the output buffer
+
+By default a Feldera pipeline sends a batch of changes to the output transport
+for each batch of input updates it processes.  This can result in a stream of
+small updates, which is normal and even preferable for output transports like
+[Kafka](/connectors/sinks/kafka); however it can cause performance problems
+for other connectors, such as the [Delta Lake connector](/connectors/sinks/delta)
+by creating a large number of small files.
+
+The output buffer mechanism is designed to solve this problem by decoupling the
+rate at which the pipeline pushes changes to the output transport from the rate
+of input changes.  It works by accumulating updates inside the pipeline
+for up to a user-defined period of time or until accumulating a user-defined number
+of updates and writing them as a single batch to the output transport.
+
+The output buffer can be setup for each individual output connector as part
+of connector configuration.  The following parameters are used to configure the
+output buffer:
+
+* `enable_output_buffer` - Enable output buffer.
+
+* `max_output_buffer_time_millis` - Maximum time in milliseconds data is kept
+   in the output buffer.
+
+   When not specified, data is kept in the buffer indefinitely until one of
+   the other trigger conditions is satisfied.  When this option is
+   set the buffer will be flushed at most every
+   `max_output_buffer_time_millis` milliseconds.
+
+   This configuration option requires the `enable_output_buffer` flag
+   to be set.
+
+* `max_output_buffer_size_records` - Maximum number of updates to be kept in
+   the output buffer.
+
+   This parameter bounds the maximal size of the buffer.
+   Note that the size of the buffer is not always equal to the
+   total number of updates output by the pipeline. Updates to the
+   same record can overwrite or cancel previous updates.
+
+   When not specified, the buffer can grow indefinitely until one of
+   the other trigger conditions is satisfied.
+
+   This configuration option requires the `enable_output_buffer` flag
+   to be set.
+
+:::note
+
+When the `enable_output_buffer` flag is set, at least one of
+`max_output_buffer_time_millis` or `max_output_buffer_size_records` must be
+specified.
+
+:::
+
+See [Delta Lake output connector documentation](/connectors/sinks/delta)
+for an example of configuring the output buffer.
+
+## Additional resources
+
+For more information, see:
+
+* [Tutorial on using input and output connectors](/tutorials/basics/part3)
+* [Tutorial on using HTTP-based input and output](/tutorials/basics/part2)
+* [Tables and views with uniqueness constraints](/connectors/unique_keys)
+* [Input connector orchestration](/connectors/orchestration)
+* [Synchronous processing with completion tokens](/connectors/completion-tokens)
+* [Configuring connectors with secrets](/connectors/secret-references)
+* [Supported source transports](/connectors/sources)
+* [Supported sinks transports](/connectors/sinks)
+* [End to end example with Kafka using Feldera Python SDK](pathname:///python/examples.html#end-to-end-example-with-kafka-sink)

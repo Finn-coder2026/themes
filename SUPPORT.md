@@ -19,6 +19,9 @@ Please include:
 - Steps to reproduce
 - Expected vs actual behavior
 
+this is new line
+
+this is new line two
 ## Feature requests
 
 Open an issue using the **Feature request** template. The more concretely you can describe the design you'd like to see, the easier it is for us to scope.
