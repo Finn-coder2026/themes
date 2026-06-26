@@ -35,6 +35,8 @@
       "name": "atlas",
       "version": "2.0.1",
       "description": "Editorial handbook with serif headlines, dark default, and masthead footer",
+      "key1": "value1",
+      "key2": "value2",
       "tags": ["editorial", "serif", "dark", "masthead"]
     }
   ]
